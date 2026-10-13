@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>岗位作业交接包智能体 · 交互 Demo（辅助核对，须人工确认）</title>
+<style>
+  :root {
+    --primary: #1a5fb4; --text: #1f2328; --muted: #5f6368;
+    --border: #d8dee4; --bg: #f5f7fa; --card: #ffffff;
+    --ok: #2e7d32; --warn: #d48806; --err: #c62828; --warn-bg: #fdf6ec; --ok-bg: #eef7ee; --err-bg: #fdecea;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; font-size: 14px; line-height: 1.6; color: var(--text); background: var(--bg); padding: 24px; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
+  header h1 { font-size: 20px; color: var(--primary); }
+  header .sub { color: var(--muted); font-size: 12px; margin: 4px 0 16px; }
+  .watermark { display: inline-block; background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); border-radius: 4px; padding: 2px 10px; font-size: 12px; margin-bottom: 16px; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .tabs button { padding: 8px 18px; border: 1px solid var(--border); background: var(--card); border-radius: 6px; cursor: pointer; font-size: 14px; }
+  .tabs button.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .panel { display: none; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; }
+  .panel.active { display: block; }
+  h2 { font-size: 16px; margin-bottom: 4px; }
+  .desc { color: var(--muted); font-size: 12px; margin-bottom: 14px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--bg); }
+  .tag { display: inline-block; padding: 1px 8px; border-radius: 4px; font-size: 12px; }
+  .tag.ok { background: var(--ok-bg); color: var(--ok); }
+  .tag.warn { background: var(--warn-bg); color: var(--warn); }
+  .tag.err { background: var(--err-bg); color: var(--err); }
+  select, input, textarea { padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px; font-family: inherit; width: 100%; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+  .field { flex: 1; min-width: 200px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .btn { padding: 8px 20px; background: var(--primary); color: #fff; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; margin-top: 6px; }
+  .btn.ghost { background: var(--card); color: var(--primary); border: 1px solid var(--primary); }
+  .result { margin-top: 14px; padding: 12px 16px; border-radius: 6px; font-size: 13px; }
+  .result.ok { background: var(--ok-bg); border-left: 4px solid var(--ok); }
+  .result.warn { background: var(--warn-bg); border-left: 4px solid var(--warn); }
+  .result.err { background: var(--err-bg); border-left: 4px solid var(--err); }
+  .src { color: var(--muted); font-size: 11px; margin-top: 8px; }
+  .kpi { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .kpi .card { flex: 1; min-width: 150px; background: var(--bg); border-radius: 8px; padding: 12px 16px; }
+  .kpi .num { font-size: 22px; font-weight: bold; color: var(--primary); }
+  .kpi .lbl { font-size: 12px; color: var(--muted); }
+  .audit-log { font-size: 12px; color: var(--muted); background: var(--bg); border-radius: 6px; padding: 10px 14px; margin-top: 16px; max-height: 180px; overflow-y: auto; }
+  .audit-log div { padding: 2px 0; border-bottom: 1px dashed var(--border); }
+  footer { margin-top: 20px; color: var(--muted); font-size: 11px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>岗位作业交接包智能体 · 交互 Demo</h1>
+    <p class="sub">对应《岗位作业交接包智能体开发方案》F1–F4 四个功能 ｜ 模拟数据源自访谈场景（合成演练）</p>
+  </header>
+  <div class="watermark">⚠ 辅助核对结果，须人工确认 —— 智能体不给出正式结论、不拦截业务动作</div>
+
+  <div class="tabs">
+    <button class="active" onclick="switchTab(0)">F1 版本核对</button>
+    <button onclick="switchTab(1)">F2 交接单结构化检查</button>
+    <button onclick="switchTab(2)">F3 异常识别</button>
+    <button onclick="switchTab(3)">F4 复核清单</button>
+    <button onclick="switchTab(4)">审计留痕</button>
+  </div>
+
+  <!-- F1 版本核对 -->
+  <div class="panel active" id="p0">
+    <h2>F1 版本核对助手</h2>
+    <p class="desc">按"版本有效期 + 确认状态"两个条件判定现行有效版本，作废版本保留原因；不靠文件名猜最新版本。发现现场使用版本与现行版本不一致时生成提示（不拦截）。【依据 f24、f11】</p>
+    <div class="row">
+      <div class="field">
+        <label>现场正在使用的工序指引版本</label>
+        <select id="f1-version">
+          <option value="v21">装配方-SOP-指引 V2.1（2026-10-10 发布）</option>
+          <option value="v20">装配方-SOP-指引 V2.0（2026-09-02 发布）</option>
+          <option value="old_file">装配方-SOP-指引-最终版-最新.docx（文件名含"最新"）</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>使用场景</label>
+        <select id="f1-shift"><option>白班 · 工序交接</option><option>夜班 · 版本变更后首个夜班</option><option>夜班 · 常规巡检</option></select>
+      </div>
+    </div>
+    <button class="btn" onclick="checkVersion()">开始核对</button>
+    <div id="f1-result"></div>
+    <table>
+      <thead><tr><th>版本</th><th>发布日期</th><th>有效期至</th><th>确认状态</th><th>判定</th><th>备注（作废原因保留）</th></tr></thead>
+      <tbody>
+        <tr><td>装配方-SOP-指引 V2.1</td><td>2026-10-10</td><td>2027-10-09</td><td>已确认（质量复核：傅景）</td><td><span class="tag ok">现行有效</span></td><td>—</td></tr>
+        <tr><td>装配方-SOP-指引 V2.0</td><td>2026-09-02</td><td>2026-10-09</td><td>已作废</td><td><span class="tag err">作废</span></td><td>保留原因：工序检查项新增（检查项 #7 复核记录），由 V2.1 替代</td></tr>
+        <tr><td>…最终版-最新.docx</td><td>未知</td><td>未知</td><td>未知</td><td><span class="tag err">不可判定</span></td><td>文件名不可作为版本依据（f24）</td></tr>
+      </tbody>
+    </table>
+    <p class="src">模拟数据。现场真实样本：工序检查项新增后，夜班仍使用旧清单并漏记一项复核（f11）。</p>
+  </div>
+
+  <!-- F2 交接单检查 -->
+  <div class="panel" id="p1">
+    <h2>F2 交接单结构化检查</h2>
+    <p class="desc">检查每张交接单是否列明三要素：最新版本号、尚未确认事项、截止时间。缺任何一项标记"不可回溯"，进入待补录清单。【依据 f23、f20】</p>
+    <div class="row">
+      <div class="field"><label>最新版本号</label><input id="f2-ver" placeholder="如：V2.1"></div>
+      <div class="field"><label>尚未确认事项</label><input id="f2-open" placeholder="如：检查项 #7 复核记录待夜班补记"></div>
+      <div class="field"><label>截止时间</label><input id="f2-due" type="date"></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>交接说明（现场常写"已完成"）</label><input id="f2-note" value="已完成"></div>
+    </div>
+    <button class="btn" onclick="checkHandover()">检查交接单</button>
+    <div id="f2-result"></div>
+    <h2 style="margin-top:20px">近期交接单检查记录</h2>
+    <table>
+      <thead><tr><th>交接单号</th><th>版本号</th><th>未确认事项</th><th>截止时间</th><th>检查结果</th></tr></thead>
+      <tbody>
+        <tr><td>HJ-20261012-003</td><td>V2.1</td><td>检查项#7 复核待补记</td><td>2026-10-13</td><td><span class="tag ok">可回溯</span></td></tr>
+        <tr><td>HJ-20261011-017</td><td>—</td><td>"已完成"</td><td>—</td><td><span class="tag err">不可回溯 · 待补录</span></td></tr>
+        <tr><td>HJ-20261011-018</td><td>V2.0</td><td>无</td><td>—</td><td><span class="tag warn">版本异常 + 缺截止时间</span></td></tr>
+      </tbody>
+    </table>
+    <p class="src">HJ-20261011-017 即访谈中的现场痛点样本：交接单只写"已完成"（f10、f23）。</p>
+  </div>
+
+  <!-- F3 异常识别 -->
+  <div class="panel" id="p2">
+    <h2>F3 异常识别辅助</h2>
+    <p class="desc">以原始记录和发生时间为准识别异常；回填时间单独标注、不作为发生时间（现场习惯先群消息解决再补表格，f13）。重点提示"版本变更后首个夜班"观察窗口。</p>
+    <div class="kpi">
+      <div class="card"><div class="num">1</div><div class="lbl">待复核异常</div></div>
+      <div class="card"><div class="num">1</div><div class="lbl">版本切换高危窗口（V2.1 发布后首个夜班 10-10）</div></div>
+      <div class="card"><div class="num">0</div><div class="lbl">被拦截的业务动作（智能体无权拦截）</div></div>
+    </div>
+    <table>
+      <thead><tr><th>异常记录</th><th>发生时间（原始记录）</th><th>回填时间（表格）</th><th>受影响对象</th><th>识别结果</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>工序检查项新增后，夜班仍使用旧清单 V2.0，漏记检查项 #7 复核</td>
+          <td>2026-10-10 22:15（群消息原始记录）</td>
+          <td>2026-10-11 08:40（次日补填）</td>
+          <td>装配方 · 夜班 A 组</td>
+          <td><span class="tag err">异常 · 待复核</span><br><span class="src">回填时间不可作为发生时间（f13）；需查原始版本判断责任（f11）</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="src">缺失值与未确认值已区分标注（f31）；问题记录保留原行（f33）。</p>
+  </div>
+
+  <!-- F4 复核清单 -->
+  <div class="panel" id="p3">
+    <h2>F4 复核清单生成</h2>
+    <p class="desc">把异常整理成待复核清单（责任人、状态、来源、建议动作），提交授权人员人工确认。<strong>智能体不给出正式结论</strong>（f41、f42）。正式结论须由授权人员确认，闭环口径 = 有责任人、有状态、有来源、有复核记录（f42）。</p>
+    <table>
+      <thead><tr><th>异常</th><th>责任人</th><th>状态</th><th>来源</th><th>建议动作</th><th>授权人员确认</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>夜班使用旧清单 V2.0，漏记检查项 #7 复核</td>
+          <td>待确认（候选：林亦舟 / 班组长）——对应 P0-1：版本维护责任人尚未书面确认</td>
+          <td><span class="tag warn">未复核</span></td>
+          <td>群消息 2026-10-10 22:15 + 交接单 HJ-20261011-018</td>
+          <td>查原始版本判定责任；补记复核记录</td>
+          <td><button class="btn ghost" style="margin:0;padding:4px 12px" onclick="confirmReview(this)">授权人员点击确认</button></td>
+        </tr>
+      </tbody>
+    </table>
+    <div id="f4-result"></div>
+    <p class="src">试点验收标准：50 次交接全部匹配指引版本；未复核异常保留责任人与状态；每条结果关联来源与人工复核记录（f42）。</p>
+  </div>
+
+  <!-- 审计 -->
+  <div class="panel" id="p4">
+    <h2>审计留痕</h2>
+    <p class="desc">记录谁查过交接包、用哪个版本、提出什么建议、谁确认——访问记录不留下最终摘要，保留全过程（f45）。本 demo 的全部操作实时记录于此。</p>
+    <div class="audit-log" id="audit"><div>— 暂无操作记录 —</div></div>
+  </div>
+
+  <footer>岗位作业交接包智能体 Demo ｜ 数据为访谈场景模拟（合成演练），不代表真实经营数据 ｜ 对应方案：output/fde-agent-plan-20261013/stage3/岗位作业交接包智能体开发方案.docx</footer>
+</div>
+
+<script>
+const auditEl = document.getElementById('audit');
+let auditEmpty = true;
+function logAudit(action) {
+  if (auditEmpty) { auditEl.innerHTML = ''; auditEmpty = false; }
+  const t = new Date().toLocaleString('zh-CN', {hour12: false});
+  const div = document.createElement('div');
+  div.textContent = `[${t}] ${action}`;
+  auditEl.prepend(div);
+}
+function switchTab(i) {
+  document.querySelectorAll('.tabs button').forEach((b, idx) => b.classList.toggle('active', idx === i));
+  document.querySelectorAll('.panel').forEach((p, idx) => p.classList.toggle('active', idx === i));
+}
+function checkVersion() {
+  const v = document.getElementById('f1-version').value;
+  const shift = document.getElementById('f1-shift').value;
+  const box = document.getElementById('f1-result');
+  let html;
+  if (v === 'v21') {
+    html = `<div class="result ok">✔ 版本一致：V2.1 为现行有效版本（有效期 2027-10-09 前，已确认）。${shift.includes('首个夜班') ? '<br>⚠ 提示：当前处于"版本变更后首个夜班"高危观察窗口，建议逐项核对检查项（f11）。' : ''}</div>`;
+  } else if (v === 'v20') {
+    html = `<div class="result err">✘ 版本不一致：V2.0 已于 2026-10-09 作废（保留原因：检查项新增，由 V2.1 替代）。现场正使用旧版本。<br>提示（不拦截）：请现场停止在该工序复核节点，记录发生节点、受影响对象、当班人员，并上报交付协调确认以哪版为准（f10）。责任由人工认定，智能体不认定责任。</div>`;
+  } else {
+    html = `<div class="result warn">？无法判定："最终版-最新.docx" 不能作为版本依据——版本判定只认"有效期 + 确认状态"两个条件，不靠文件名猜最新版本（f24）。</div>`;
+  }
+  box.innerHTML = html;
+  logAudit(`F1 版本核对：使用版本=${v === 'old_file' ? '文件名含最新(不可判定)' : v}，场景=${shift}，已留痕（访问记录四要素：谁查过/哪一版/什么建议/谁确认，f45）`);
+}
+function checkHandover() {
+  const ver = document.getElementById('f2-ver').value.trim();
+  const open = document.getElementById('f2-open').value.trim();
+  const due = document.getElementById('f2-due').value;
+  const note = document.getElementById('f2-note').value.trim();
+  const missing = [];
+  if (!ver) missing.push('最新版本号');
+  if (!open) missing.push('尚未确认事项');
+  if (!due) missing.push('截止时间');
+  const box = document.getElementById('f2-result');
+  if (missing.length === 0) {
+    box.innerHTML = `<div class="result ok">✔ 交接单可回溯：版本 ${ver}、未确认事项「${open}」、截止 ${due} 三要素齐备。备注「${note}」已挂接结构化字段。</div>`;
+  } else {
+    box.innerHTML = `<div class="result err">✘ 交接单"不可回溯"：缺少 ${missing.join('、')}。已进入待补录清单——只写「${note || '已完成'}」不能作为交接完成依据（f23）。补录须挂版本与未结项，不得覆盖已确认接收人记录（f25、f20）。</div>`;
+  }
+  logAudit(`F2 交接单检查：版本=${ver || '缺失'}，未确认事项=${open ? '有' : '缺失'}，截止时间=${due || '缺失'} → ${missing.length ? '不可回溯' : '可回溯'}`);
+}
+function confirmReview(btn) {
+  const box = document.getElementById('f4-result');
+  box.innerHTML = `<div class="result ok">✔ 授权人员已确认（demo 中默认确认人为：质量复核负责人）。复核记录已写入：责任人、状态、来源、复核人四要素齐备，该异常闭环（f42）。<br>审计留痕：谁查过、用哪个版本、提了什么建议、谁确认——已完整记录，不留最终摘要（f45）。</div>`;
+  btn.disabled = true; btn.textContent = '已确认 ✓';
+  logAudit('F4 复核确认：授权人员（demo：质量复核负责人）确认异常"夜班使用旧清单漏记复核"，闭环四要素齐备（f41、f42）');
+}
+</script>
+</body>
+</html>
